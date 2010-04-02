@@ -3,7 +3,7 @@
 	Class extension_export_members_install_file extends Extension{
 
 		public function about(){
-			return array('name' => 'Export Members Install File',
+			return array('name' => 'Export Members Ensemble',
 						 'version' => '1.2',
 						 'release-date' => '2010-04-02',
 						 'author' => array('name' => 'Stephen Bau',
@@ -11,7 +11,7 @@
 										   'email' => 'stephen@domain7.com')
 				 		);
 		}
-		
+
 		public function getSubscribedDelegates(){
 			return array(
 						array(
@@ -22,22 +22,22 @@
 
 					);
 		}
-		
+
 		public function install(){
-			
+
 			if(!class_exists('ZipArchive')){
-				Administration::instance()->Page->pageAlert(__('Export Install File cannot be installed, since the "<a href="http://php.net/manual/en/book.zip.php">ZipArchive</a>" class is not available. Ensure that PHP was compiled with the <code>--enable-zip</code> flag.'), AdministrationPage::PAGE_ALERT_ERROR);
+				Administration::instance()->Page->pageAlert(__('Export Members Ensemble cannot be installed, since the "<a href="http://php.net/manual/en/book.zip.php">ZipArchive</a>" class is not available. Ensure that PHP was compiled with the <code>--enable-zip</code> flag.'), AdministrationPage::PAGE_ALERT_ERROR);
 				return false;
 			}
-			
+
 			return true;
 		}
-		
+
 		private function __addFolderToArchive(&$archive, $path, $parent=NULL){
 			$iterator = new DirectoryIterator($path);
 			foreach($iterator as $file){
 				if($file->isDot() || preg_match('/^\./', $file->getFilename())) continue;
-				
+
 				elseif($file->isDir()){
 					$this->__addFolderToArchive($archive, $file->getPathname(), $parent);
 				}
@@ -45,12 +45,12 @@
 				else $archive->addFile($file->getPathname(), ltrim(str_replace($parent, NULL, $file->getPathname()), '/'));
 			}
 		}
-		
+
 		private function __export(){
 			$sql_schema = $sql_data = NULL;
-			
+
 			require_once(dirname(__FILE__) . '/lib/class.mysqldump.php');
-			
+
 			$dump = new MySQLDump($this->_Parent->Database);
 
 			$tables = array(
@@ -73,13 +73,13 @@
 				'tbl_members_roles_event_permissions',
 				'tbl_members_roles_page_permissions'
 			);
-			
+
 			## Grab the schema
 			foreach($tables as $t) $sql_schema .= $dump->export($t, MySQLDump::STRUCTURE_ONLY);
 			$sql_schema = str_replace('`' . $this->_Parent->Configuration->get('tbl_prefix', 'database'), '`tbl_', $sql_schema);
-			
+
 			$sql_schema = preg_replace('/AUTO_INCREMENT=\d+/i', '', $sql_schema);
-			
+
 			$tables = array(
 				'tbl_entries',
 				'tbl_extensions',
@@ -96,18 +96,21 @@
 				'tbl_members_roles_event_permissions',
 				'tbl_members_roles_page_permissions'
 			);
-			
+
 			## Field data and entry data schemas needs to be apart of the workspace sql dump
 			$sql_data  = $dump->export('tbl_fields_%', MySQLDump::ALL);
 			$sql_data .= $dump->export('tbl_entries_%', MySQLDump::ALL);
-			
+
 			## Grab the data
-			foreach($tables as $t) $sql_data .= $dump->export($t, MySQLDump::DATA_ONLY);
-			$sql_data = str_replace('`' . $this->_Parent->Configuration->get('tbl_prefix', 'database'), '`tbl_', $sql_data);
-			
+			foreach($tables as $t){
+				$sql_data .= $dump->export($t, MySQLDump::DATA_ONLY);
+			}
+
+			$sql_data = str_replace('`' . Administration::instance()->Configuration->get('tbl_prefix', 'database'), '`tbl_', $sql_data);
+
 			$config_string = NULL;
-			$config = $this->_Parent->Configuration->get();	
-			
+			$config = Administration::instance()->Configuration->get();
+
 			unset($config['symphony']['build']);
 			unset($config['symphony']['cookie_prefix']);
 			unset($config['general']['useragent']);
@@ -122,83 +125,111 @@
 			unset($config['region']['timezone']);
 
 			foreach($config as $group => $set){
-				foreach($set as $key => $val) $config_string .= "		\$conf['".$group."']['".$key."'] = '".$val."';" . self::CRLF;
+				foreach($set as $key => $val){
+					$config_string .= "		\$conf['{$group}']['{$key}'] = '{$val}';" . self::CRLF;
+				}
 			}
-			
+
 			$install_template = str_replace(
-				
+
 									array(
 										'<!-- BUILD -->',
 										'<!-- VERSION -->',
-										'<!-- ENCODED SQL SCHEMA DUMP -->',
-										'<!-- ENCODED SQL DATA DUMP -->',
 										'<!-- CONFIGURATION -->'
 									),
-				
+
 									array(
-										$this->_Parent->Configuration->get('build', 'symphony'),
-										$this->_Parent->Configuration->get('version', 'symphony'),	
-										base64_encode($sql_schema),
-										base64_encode($sql_data),
-										trim($config_string),										
+										Administration::instance()->Configuration->get('build', 'symphony'),
+										Administration::instance()->Configuration->get('version', 'symphony'),
+										trim($config_string),
 									),
-				
+
 									file_get_contents(dirname(__FILE__) . '/lib/installer.tpl')
 			);
-			
+
 			$archive = new ZipArchive;
-			$res = $archive->open(TMP . '/install.tmp.zip', ZipArchive::CREATE);
-			
+			$res = $archive->open(TMP . '/ensemble.tmp.zip', ZipArchive::CREATE);
+
 			if ($res === TRUE) {
-				
+
+				$this->__addFolderToArchive($archive, EXTENSIONS, DOCROOT);
+				$this->__addFolderToArchive($archive, SYMPHONY, DOCROOT);
+				$this->__addFolderToArchive($archive, WORKSPACE, DOCROOT);
+
+				$archive->addFromString('install.php', $install_template);
+				$archive->addFromString('install.sql', $sql_schema);
 				$archive->addFromString('workspace/install.sql', $sql_data);
-				
+
+				$archive->addFile(DOCROOT . '/index.php', 'index.php');
+
+				$readme_files = glob(DOCROOT . '/README.*');
+				if(is_array($readme_files) && !empty($readme_files)){
+					foreach($readme_files as $filename){
+						$archive->addFile($filename, basename($filename));
+					}
+				}
+
+				if(is_file(DOCROOT . '/README')) $archive->addFile(DOCROOT . '/README', 'README');
+				if(is_file(DOCROOT . '/LICENCE')) $archive->addFile(DOCROOT . '/LICENCE', 'LICENCE');
+				if(is_file(DOCROOT . '/update.php')) $archive->addFile(DOCROOT . '/update.php', 'update.php');
+
 			}
-			
+
 			$archive->close();
 
-			header('Content-type: application/octet-stream');	
+			header('Content-type: application/octet-stream');
 			header('Expires: ' . gmdate('D, d M Y H:i:s') . ' GMT');
-		    header('Content-disposition: attachment; filename='.Lang::createFilename($this->_Parent->Configuration->get('sitename', 'general')).'-install.zip');
+
+		    header(
+				sprintf(
+					'Content-disposition: attachment; filename=%s-ensemble.zip',
+					Lang::createFilename(
+						Administration::instance()->Configuration->get('sitename', 'general')
+					)
+				)
+			);
+
 		    header('Pragma: no-cache');
-		
-			readfile(TMP . '/install.tmp.zip');
-			unlink(TMP . '/install.tmp.zip');
+
+			readfile(TMP . '/ensemble.tmp.zip');
+			unlink(TMP . '/ensemble.tmp.zip');
 			exit();
-			
+
 		}
 
 		public function __SavePreferences($context){
 			$this->__export();
 		}
-		
+
 		public function appendPreferences($context){
-			
+
 			if(isset($_POST['action']['export'])){
 				$this->__SavePreferences($context);
 			}
-			
+
 			$group = new XMLElement('fieldset');
 			$group->setAttribute('class', 'settings');
-			$group->appendChild(new XMLElement('legend', 'Export Members Install File'));			
-			
+			$group->appendChild(new XMLElement('legend', __('Export Members Ensemble')));
 
-			$div = new XMLElement('div', NULL, array('id' => 'file-actions', 'class' => 'label'));			
+
+			$div = new XMLElement('div', NULL, array('id' => 'file-actions', 'class' => 'label'));
 			$span = new XMLElement('span');
-			
+
 			if(!class_exists('ZipArchive')){
-				$span->appendChild(new XMLElement('p', '<strong>Warning: It appears you do not have the "ZipArchive" class available. Ensure that PHP was compiled with <code>--enable-zip</code>'));
+				$span->appendChild(
+					new XMLElement('p', '<strong>' . __('Warning: It appears you do not have the "ZipArchive" class available. Ensure that PHP was compiled with <code>--enable-zip</code>') . '<strong>')
+				);
 			}
 			else{
-				$span->appendChild(new XMLElement('button', 'Create Install File', array('name' => 'action[export]', 'type' => 'submit')));	
+				$span->appendChild(new XMLElement('button', __('Create Ensemble'), array('name' => 'action[export]', 'type' => 'submit')));
 			}
-			
+
 			$div->appendChild($span);
 
-			$div->appendChild(new XMLElement('p', 'Packages <code>workspace/install.sql</code> file as a <code>.zip</code> archive for download.', array('class' => 'help')));	
+			$div->appendChild(new XMLElement('p', __('Packages entire site as a <code>.zip</code> archive for download.'), array('class' => 'help')));
 
-			$group->appendChild($div);						
+			$group->appendChild($div);
 			$context['wrapper']->appendChild($group);
-						
+
 		}
 	}

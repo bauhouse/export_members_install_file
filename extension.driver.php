@@ -1,6 +1,6 @@
 <?php
 
-	Class extension_export_install_file extends Extension{
+	Class extension_export_members_install_file extends Extension{
 
 		public function about(){
 			return array('name' => 'Export Members Install File',
@@ -180,7 +180,7 @@
 			
 			$group = new XMLElement('fieldset');
 			$group->setAttribute('class', 'settings');
-			$group->appendChild(new XMLElement('legend', 'Export Install File'));			
+			$group->appendChild(new XMLElement('legend', 'Export Members Install File'));			
 			
 
 			$div = new XMLElement('div', NULL, array('id' => 'file-actions', 'class' => 'label'));			
@@ -195,7 +195,7 @@
 			
 			$div->appendChild($span);
 
-			$div->appendChild(new XMLElement('p', 'Packages workspace/install.sql file as a <code>.zip</code> archive for download.', array('class' => 'help')));	
+			$div->appendChild(new XMLElement('p', 'Packages <code>workspace/install.sql</code> file as a <code>.zip</code> archive for download.', array('class' => 'help')));	
 
 			$group->appendChild($div);						
 			$context['wrapper']->appendChild($group);

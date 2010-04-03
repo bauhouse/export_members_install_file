@@ -71,7 +71,7 @@
 				'tbl_members_email_templates_role_mapping',
 				'tbl_members_roles',
 				'tbl_members_roles_event_permissions',
-				'tbl_members_roles_page_permissions'
+				'tbl_members_roles_forbidden_pages'
 			);
 
 			## Grab the schema
@@ -94,7 +94,7 @@
 				'tbl_members_email_templates_role_mapping',
 				'tbl_members_roles',
 				'tbl_members_roles_event_permissions',
-				'tbl_members_roles_page_permissions'
+				'tbl_members_roles_forbidden_pages'
 			);
 
 			## Field data and entry data schemas needs to be apart of the workspace sql dump
